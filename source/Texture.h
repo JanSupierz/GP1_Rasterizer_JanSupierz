@@ -16,6 +16,8 @@ namespace dae
 		ColorRGB Sample(const Vector2& uv) const;
 
 	private:
+		Uint8 *m_pRed, * m_pGreen, * m_pBlue;
+
 		Texture(SDL_Surface* pSurface);
 
 		SDL_Surface* m_pSurface{ nullptr };

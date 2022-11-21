@@ -26,14 +26,14 @@ namespace dae
 		return a * a;
 	}
 
-	inline float Lerpf(float a, float b, float factor)
+	inline float Lerpf(float a, float m_pBlue, float factor)
 	{
-		return ((1 - factor) * a) + (factor * b);
+		return ((1 - factor) * a) + (factor * m_pBlue);
 	}
 
-	inline bool AreEqual(float a, float b, float epsilon = FLT_EPSILON)
+	inline bool AreEqual(float a, float m_pBlue, float epsilon = FLT_EPSILON)
 	{
-		return abs(a - b) < epsilon;
+		return abs(a - m_pBlue) < epsilon;
 	}
 
 	inline int Clamp(const int v, int min, int max)

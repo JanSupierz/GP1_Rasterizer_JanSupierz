@@ -40,14 +40,27 @@ namespace dae
 		SDL_Surface* m_pBackBuffer{ nullptr };
 		uint32_t* m_pBackBufferPixels{};
 
-		//float* m_pDepthBufferPixels{};
+		float* m_pDepthBufferPixels{};
 
 		Camera m_Camera{};
+
+		Texture* m_pTexture;
 
 		int m_Width{};
 		int m_Height{};
 
 		//Function that transforms the vertices from the mesh from World space to Screen space
-		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const; //W1 Version
+		void VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const; //W1 version
+		void VertexTransformationFunction(std::vector<Mesh>& meshes) const; //W2 version
+
+		void Render_W1_Part1() const;
+		void Render_W1_Part2() const;
+		void Render_W1_Part3() const;
+		void Render_W1_Part4() const;
+		void Render_W1_Part5() const;
+
+		void Render_W2_Part1() const;
+		void Render_W2_Part2() const;
+		void Render_W2_Part3() const;
 	};
 }

@@ -5,100 +5,100 @@ namespace dae
 {
 	struct ColorRGB
 	{
-		float r{};
-		float g{};
-		float b{};
+		float m_pRed{};
+		float m_pGreen{};
+		float m_pBlue{};
 
 		void MaxToOne()
 		{
-			const float maxValue = std::max(r, std::max(g, b));
+			const float maxValue = std::max(m_pRed, std::max(m_pGreen, m_pBlue));
 			if (maxValue > 1.f)
 				*this /= maxValue;
 		}
 
 		static ColorRGB Lerp(const ColorRGB& c1, const ColorRGB& c2, float factor)
 		{
-			return { Lerpf(c1.r, c2.r, factor), Lerpf(c1.g, c2.g, factor), Lerpf(c1.b, c2.b, factor) };
+			return { Lerpf(c1.m_pRed, c2.m_pRed, factor), Lerpf(c1.m_pGreen, c2.m_pGreen, factor), Lerpf(c1.m_pBlue, c2.m_pBlue, factor) };
 		}
 
 		#pragma region ColorRGB (Member) Operators
 		const ColorRGB& operator+=(const ColorRGB& c)
 		{
-			r += c.r;
-			g += c.g;
-			b += c.b;
+			m_pRed += c.m_pRed;
+			m_pGreen += c.m_pGreen;
+			m_pBlue += c.m_pBlue;
 
 			return *this;
 		}
 
 		ColorRGB operator+(const ColorRGB& c) const
 		{
-			return { r + c.r, g + c.g, b + c.b };
+			return { m_pRed + c.m_pRed, m_pGreen + c.m_pGreen, m_pBlue + c.m_pBlue };
 		}
 
 		const ColorRGB& operator-=(const ColorRGB& c)
 		{
-			r -= c.r;
-			g -= c.g;
-			b -= c.b;
+			m_pRed -= c.m_pRed;
+			m_pGreen -= c.m_pGreen;
+			m_pBlue -= c.m_pBlue;
 
 			return *this;
 		}
 
 		ColorRGB operator-(const ColorRGB& c) const
 		{
-			return { r - c.r, g - c.g, b - c.b };
+			return { m_pRed - c.m_pRed, m_pGreen - c.m_pGreen, m_pBlue - c.m_pBlue };
 		}
 
 		const ColorRGB& operator*=(const ColorRGB& c)
 		{
-			r *= c.r;
-			g *= c.g;
-			b *= c.b;
+			m_pRed *= c.m_pRed;
+			m_pGreen *= c.m_pGreen;
+			m_pBlue *= c.m_pBlue;
 
 			return *this;
 		}
 
 		ColorRGB operator*(const ColorRGB& c) const
 		{
-			return { r * c.r, g * c.g, b * c.b };
+			return { m_pRed * c.m_pRed, m_pGreen * c.m_pGreen, m_pBlue * c.m_pBlue };
 		}
 
 		const ColorRGB& operator/=(const ColorRGB& c)
 		{
-			r /= c.r;
-			g /= c.g;
-			b /= c.b;
+			m_pRed /= c.m_pRed;
+			m_pGreen /= c.m_pGreen;
+			m_pBlue /= c.m_pBlue;
 
 			return *this;
 		}
 
 		const ColorRGB& operator*=(float s)
 		{
-			r *= s;
-			g *= s;
-			b *= s;
+			m_pRed *= s;
+			m_pGreen *= s;
+			m_pBlue *= s;
 
 			return *this;
 		}
 
 		ColorRGB operator*(float s) const
 		{
-			return { r * s, g * s,b * s };
+			return { m_pRed * s, m_pGreen * s,m_pBlue * s };
 		}
 
 		const ColorRGB& operator/=(float s)
 		{
-			r /= s;
-			g /= s;
-			b /= s;
+			m_pRed /= s;
+			m_pGreen /= s;
+			m_pBlue /= s;
 
 			return *this;
 		}
 
 		ColorRGB operator/(float s) const
 		{
-			return { r / s, g / s,b / s };
+			return { m_pRed / s, m_pGreen / s,m_pBlue / s };
 		}
 		#pragma endregion
 	};

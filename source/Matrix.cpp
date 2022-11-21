@@ -73,11 +73,11 @@ namespace dae {
 	const Matrix& Matrix::Transpose()
 	{
 		Matrix result{};
-		for (int r{ 0 }; r < 4; ++r)
+		for (int m_pRed{ 0 }; m_pRed < 4; ++m_pRed)
 		{
 			for (int c{ 0 }; c < 4; ++c)
 			{
-				result[r][c] = data[c][r];
+				result[m_pRed][c] = data[c][m_pRed];
 			}
 		}
 
@@ -93,7 +93,7 @@ namespace dae {
 	{
 		//Optimized Inverse as explained in FGED1 - used widely in other libraries too.
 		const Vector3& a = data[0];
-		const Vector3& b = data[1];
+		const Vector3& m_pBlue = data[1];
 		const Vector3& c = data[2];
 		const Vector3& d = data[3];
 
@@ -102,9 +102,9 @@ namespace dae {
 		const float z = data[2][3];
 		const float w = data[3][3];
 
-		Vector3 s = Vector3::Cross(a, b);
+		Vector3 s = Vector3::Cross(a, m_pBlue);
 		Vector3 t = Vector3::Cross(c, d);
-		Vector3 u = a * y - b * x;
+		Vector3 u = a * y - m_pBlue * x;
 		Vector3 v = c * w - d * z;
 
 		float det = Vector3::Dot(s, v) + Vector3::Dot(t, u);
@@ -113,7 +113,7 @@ namespace dae {
 
 		s *= invDet; t *= invDet; u *= invDet; v *= invDet;
 
-		Vector3 r0 = Vector3::Cross(b, v) + t * y;
+		Vector3 r0 = Vector3::Cross(m_pBlue, v) + t * y;
 		Vector3 r1 = Vector3::Cross(v, a) - t * x;
 		Vector3 r2 = Vector3::Cross(d, u) + s * w;
 		Vector3 r3 = Vector3::Cross(u, c) - s * z;
@@ -121,7 +121,7 @@ namespace dae {
 		data[0] = Vector4{ r0.x, r1.x, r2.x, 0.f };
 		data[1] = Vector4{ r0.y, r1.y, r2.y, 0.f };
 		data[2] = Vector4{ r0.z, r1.z, r2.z, 0.f };
-		data[3] = { { -Vector3::Dot(b, t)},{Vector3::Dot(a, t)},{-Vector3::Dot(d, s)},{Vector3::Dot(c, s)} };
+		data[3] = { { -Vector3::Dot(m_pBlue, t)},{Vector3::Dot(a, t)},{-Vector3::Dot(d, s)},{Vector3::Dot(c, s)} };
 
 		return *this;
 	}
@@ -144,9 +144,17 @@ namespace dae {
 
 	Matrix Matrix::CreateLookAtLH(const Vector3& origin, const Vector3& forward, const Vector3& up)
 	{
-		//TODO W1
+		Vector3 zAxis{ forward };
+		Vector3 xAxis{ Vector3::Cross(up, zAxis).Normalized() };
+		Vector3 yAxis{ Vector3::Cross(zAxis, xAxis) };
 
-		return {};
+		return
+		{
+			{xAxis.x, yAxis.x, zAxis.x, 0},
+			{xAxis.y, yAxis.y, zAxis.y, 0},
+			{xAxis.z, yAxis.z, zAxis.z, 0},
+			{-Vector3::Dot(xAxis, origin), -Vector3::Dot(yAxis, origin), -Vector3::Dot(zAxis, origin), 1}
+		};
 	}
 
 	Matrix Matrix::CreatePerspectiveFovLH(float fov, float aspect, float zn, float zf)
@@ -221,9 +229,9 @@ namespace dae {
 		return CreateRotation({ pitch, yaw, roll });
 	}
 
-	Matrix Matrix::CreateRotation(const Vector3& r)
+	Matrix Matrix::CreateRotation(const Vector3& m_pRed)
 	{
-		return CreateRotationX(r[0]) * CreateRotationY(r[1]) * CreateRotationZ(r[2]);
+		return CreateRotationX(m_pRed[0]) * CreateRotationY(m_pRed[1]) * CreateRotationZ(m_pRed[2]);
 	}
 
 	Matrix Matrix::CreateScale(float sx, float sy, float sz)
@@ -254,11 +262,11 @@ namespace dae {
 		Matrix result{};
 		Matrix m_transposed = Transpose(m);
 
-		for (int r{ 0 }; r < 4; ++r)
+		for (int m_pRed{ 0 }; m_pRed < 4; ++m_pRed)
 		{
 			for (int c{ 0 }; c < 4; ++c)
 			{
-				result[r][c] = Vector4::Dot(data[r], m_transposed[c]);
+				result[m_pRed][c] = Vector4::Dot(data[m_pRed], m_transposed[c]);
 			}
 		}
 
@@ -270,11 +278,11 @@ namespace dae {
 		Matrix copy{ *this };
 		Matrix m_transposed = Transpose(m);
 
-		for (int r{ 0 }; r < 4; ++r)
+		for (int m_pRed{ 0 }; m_pRed < 4; ++m_pRed)
 		{
 			for (int c{ 0 }; c < 4; ++c)
 			{
-				data[r][c] = Vector4::Dot(copy[r], m_transposed[c]);
+				data[m_pRed][c] = Vector4::Dot(copy[m_pRed], m_transposed[c]);
 			}
 		}
 

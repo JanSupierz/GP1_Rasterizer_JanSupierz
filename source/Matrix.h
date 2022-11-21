@@ -42,7 +42,7 @@ namespace dae {
 		static Matrix CreateRotationY(float yaw);
 		static Matrix CreateRotationZ(float roll);
 		static Matrix CreateRotation(float pitch, float yaw, float roll);
-		static Matrix CreateRotation(const Vector3& r);
+		static Matrix CreateRotation(const Vector3& m_pRed);
 		static Matrix CreateScale(float sx, float sy, float sz);
 		static Matrix CreateScale(const Vector3& s);
 		static Matrix Transpose(const Matrix& m);
