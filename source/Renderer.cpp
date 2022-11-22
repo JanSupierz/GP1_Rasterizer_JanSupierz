@@ -151,22 +151,22 @@ void Renderer::Render_W2_Part3() const
 		//1 of the 2 below indices has to be uncommitted together with the PrimitiveTropology::...
 
 		//indices for triangleList
-			//{
-			//	3, 0, 1,    1, 4, 3,    4, 1, 2,
-			//	2, 5, 4,    6, 3, 4,    4, 7, 6,
-			//	7, 4, 5,    5, 8, 7
-			//},
-
-			//PrimitiveTopology::TriangleList
-
-		//indices for triangleStrip
 			{
-				3, 0, 4, 1, 5, 2,
-				2, 6,
-				6, 3, 7, 4, 8, 5
+				3, 0, 1,    1, 4, 3,    4, 1, 2,
+				2, 5, 4,    6, 3, 4,    4, 7, 6,
+				7, 4, 5,    5, 8, 7
 			},
 
-			PrimitiveTopology::TriangleStrip
+			PrimitiveTopology::TriangleList
+
+		//indices for triangleStrip
+			//{
+			//	3, 0, 4, 1, 5, 2,
+			//	2, 6,
+			//	6, 3, 7, 4, 8, 5
+			//},
+
+			//PrimitiveTopology::TriangleStrip
 		}
 	};
 
@@ -174,15 +174,17 @@ void Renderer::Render_W2_Part3() const
 
 	for (Mesh& mesh : meshes_world)
 	{
-		const int increment{ mesh.primitiveTopology == PrimitiveTopology::TriangleList ? 3 : 1 };
-		const int maxCount{ mesh.primitiveTopology == PrimitiveTopology::TriangleList ? static_cast<int>(mesh.indices.size()) : static_cast<int>(mesh.indices.size()) - 2 };
+		const bool isTriangleList{ mesh.primitiveTopology == PrimitiveTopology::TriangleList };
+
+		const int increment{ isTriangleList * 3 + !isTriangleList * 1 };
+		const int maxCount{ static_cast<int>(mesh.indices.size()) + !isTriangleList * (-2) };  //Max = nrIndices + 0 bij triangleStrip of -2 bij triangleList
 
 		for (size_t index{}; index < maxCount; index += increment)
 		{
 			if (mesh.indices[index] == mesh.indices[index + 1] || mesh.indices[index] == mesh.indices[index + 2] || mesh.indices[index + 1] == mesh.indices[index + 2]) continue;
 
 			const Vector2 v0{ mesh.vertices_out[mesh.indices[index]].position.GetXY() };
-			const Vector2 v1{ mesh.vertices_out[mesh.indices[index + 1]].position.GetXY() };
+			const Vector2 v1{ mesh.vertices_out[mesh.indices[index + 1 ]].position.GetXY() };
 			const Vector2 v2{ mesh.vertices_out[mesh.indices[index + 2]].position.GetXY() };
 
 			Vector2 min{ std::min(v0.x, v1.x),std::min(v0.y, v1.y) };
@@ -195,42 +197,29 @@ void Renderer::Render_W2_Part3() const
 
 
 			//RENDER LOGIC
-			for (int px{}; px < m_Width; ++px)
+			for (int px{ std::max(0,static_cast<int>(min.x)) }; px < std::min(m_Width, static_cast<int>(max.x)); ++px)
 			{
-				if (px >= min.x && px <= max.x)
+				for (int py{ std::max(0,static_cast<int>(min.y)) }; py < std::min(m_Height, static_cast<int>(max.y)); ++py)
 				{
-					for (int py{}; py < m_Height; ++py)
+					Vector3 vertexRatio{};
+
+					if (!Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio, !isTriangleList && index & 0x01)) continue;
+
+					const float currentDepth{ 1.f / ((vertexRatio.x / mesh.vertices_out[mesh.indices[index]].position.z) + (vertexRatio.y / mesh.vertices_out[mesh.indices[index + 1]].position.z) + (vertexRatio.z / mesh.vertices_out[mesh.indices[index + 2]].position.z)) };
+
+					if (currentDepth < m_pDepthBufferPixels[px + (py * m_Width)])
 					{
-						if (py >= min.y && py <= max.y)
-						{
-							Vector3 vertexRatio{};
+						m_pDepthBufferPixels[px + (py * m_Width)] = currentDepth;
 
-							if (increment == 1 && index & 0x01)
-							{
-								if (!Utils::HitTest_TriangleOdd(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio)) continue;
-							}
-							else
-							{
-								if (!Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio)) continue;
-							}
+						ColorRGB finalColor{ m_pTexture->Sample((mesh.vertices[mesh.indices[index]].uv * vertexRatio.x / mesh.vertices_out[mesh.indices[index]].position.z + mesh.vertices[mesh.indices[index + 1]].uv * vertexRatio.y / mesh.vertices_out[mesh.indices[index + 1]].position.z + mesh.vertices[mesh.indices[index + 2]].uv * vertexRatio.z / mesh.vertices_out[mesh.indices[index + 2]].position.z) * currentDepth) };
 
-							const float currentDepth{ 1.f / ((vertexRatio.x / mesh.vertices_out[mesh.indices[index]].position.z) + (vertexRatio.y / mesh.vertices_out[mesh.indices[index + 1]].position.z) + (vertexRatio.z / mesh.vertices_out[mesh.indices[index + 2]].position.z)) };
+						//Update Color in Buffer
+						finalColor.MaxToOne();
 
-							if (currentDepth < m_pDepthBufferPixels[px + (py * m_Width)])
-							{
-								m_pDepthBufferPixels[px + (py * m_Width)] = currentDepth;
-
-								ColorRGB finalColor{ m_pTexture->Sample((mesh.vertices[mesh.indices[index]].uv * vertexRatio.x / mesh.vertices_out[mesh.indices[index]].position.z + mesh.vertices[mesh.indices[index + 1]].uv * vertexRatio.y / mesh.vertices_out[mesh.indices[index + 1]].position.z + mesh.vertices[mesh.indices[index + 2]].uv * vertexRatio.z / mesh.vertices_out[mesh.indices[index + 2]].position.z) * currentDepth) };
-
-								//Update Color in Buffer
-								finalColor.MaxToOne();
-
-								m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-									static_cast<uint8_t>(finalColor.m_pRed * 255),
-									static_cast<uint8_t>(finalColor.m_pGreen * 255),
-									static_cast<uint8_t>(finalColor.m_pBlue * 255));
-							}
-						}
+						m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
+							static_cast<uint8_t>(finalColor.m_pRed * 255),
+							static_cast<uint8_t>(finalColor.m_pGreen * 255),
+							static_cast<uint8_t>(finalColor.m_pBlue * 255));
 					}
 				}
 			}

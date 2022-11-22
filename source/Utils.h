@@ -22,7 +22,7 @@ namespace dae
 
 			currentEdge = v1 - v0;
 			const float thirdArea{ Vector2::Cross(pixelVector - v0,currentEdge) };
-			if (thirdArea < 0.f) return false;
+			if (thirdArea< 0.f) return false;
 
 			const float inverseTotalArea{ 1.f / (firstArea + secondArea + thirdArea) };
 
@@ -53,6 +53,31 @@ namespace dae
 			ratio.y = secondArea * inverseTotalArea;
 			ratio.z = thirdArea * inverseTotalArea;
 			
+			return true;
+		}
+
+		inline bool HitTest_Triangle(const Vector2& pixelVector, const Vector2& v0, const Vector2& v1, const Vector2& v2, Vector3& ratio,const bool shouldSwap)
+		{
+			const int swapFactor{ (-1 * shouldSwap + !shouldSwap) }; //1 bij normale driehoeken, -1 bij speciale
+
+			Vector2 currentEdge{ v2 - v1 };
+			const float firstArea{swapFactor * Vector2::Cross(currentEdge, pixelVector - v1)};
+			if (firstArea < 0.f) return false;
+
+			currentEdge = v0 - v2;
+			const float secondArea{swapFactor * Vector2::Cross(currentEdge, pixelVector - v2) };
+			if (secondArea < 0.f) return false;
+
+			currentEdge = v1 - v0;
+			const float thirdArea{swapFactor * Vector2::Cross(currentEdge, pixelVector - v0) };
+			if (thirdArea < 0.f) return false;
+
+			const float inverseTotalArea{ swapFactor / (firstArea + secondArea + thirdArea) };
+
+			ratio.x = firstArea * inverseTotalArea;
+			ratio.y = secondArea * inverseTotalArea;
+			ratio.z = thirdArea * inverseTotalArea;
+
 			return true;
 		}
 
