@@ -25,9 +25,52 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	m_pDepthBufferPixels = new float[m_Width * m_Height];
 
 	//Initialize Camera
-	m_Camera.Initialize(60.f, { .0f,.0f,-10.f });
+	m_Camera.Initialize(60.f, { .0f,5.f,-30.f }, m_Width / static_cast<float>(m_Height));
 
-	m_pTexture = Texture::LoadFromFile("Resources/uv_grid_2.png");
+	//m_pTexture = Texture::LoadFromFile("Resources/uv_grid_2.png");
+
+	//m_MeshesWorld = 
+	//{
+	//	Mesh
+	//	{
+	//		{
+	//			Vertex{{-3.f, 3.f, -2.f},colors::White, {0,0}},
+	//			Vertex{{0.f, 3.f, -2.f},colors::White,  {0.5,0}},
+	//			Vertex{{3.f, 3.f, -2.f},colors::White,  {1,0}},
+	//			Vertex{{-3.f, 0.f, -2.f},colors::White, {0,0.5}},
+	//			Vertex{{0.f, 0.f, -2.f},colors::White,  {0.5,0.5}},
+	//			Vertex{{3.f, 0.f, -2.f},colors::White,  {1,0.5}},
+	//			Vertex{{-3.f, -3.f, -2.f},colors::White,{0,1}},
+	//			Vertex{{0.f, -3.f, -2.f},colors::White, {0.5,1}},
+	//			Vertex{{3.f, -3.f, -2.f},colors::White, {1,1}}
+	//		},
+
+	//	//indices for triangleList
+	//		{
+	//			3, 0, 1,    1, 4, 3,    4, 1, 2,
+	//			2, 5, 4,    6, 3, 4,    4, 7, 6,
+	//			7, 4, 5,    5, 8, 7
+	//		},
+
+	//		PrimitiveTopology::TriangleList
+
+	//	//indices for triangleStrip
+	//		//{
+	//		//	3, 0, 4, 1, 5, 2,
+	//		//	2, 6,
+	//		//	6, 3, 7, 4, 8, 5
+	//		//},
+
+	//		//PrimitiveTopology::TriangleStrip
+	//	}
+	//};
+
+	m_MeshesWorld = { Mesh{} };
+
+	m_pTexture = Texture::LoadFromFile("Resources/tuktuk.png");
+
+	m_MeshesWorld[0].primitiveTopology = PrimitiveTopology::TriangleList;
+	Utils::ParseOBJ("Resources/tuktuk.obj", m_MeshesWorld[0].vertices, m_MeshesWorld[0].indices);
 }
 
 Renderer::~Renderer()
@@ -39,6 +82,8 @@ Renderer::~Renderer()
 void Renderer::Update(Timer* pTimer)
 {
 	m_Camera.Update(pTimer);
+
+	m_MeshesWorld[0].worldMatrix = Matrix::CreateRotationY(pTimer->GetTotal());
 }
 
 void Renderer::Render()
@@ -47,16 +92,8 @@ void Renderer::Render()
 	//Lock BackBuffer
 	SDL_LockSurface(m_pBackBuffer);
 
-	//Render_W1_Part1();
-	//Render_W1_Part2();
-	//Render_W1_Part3();
-	//Render_W1_Part4();
-	//Render_W1_Part5();
+	Render_W3_Part1();
 
-	//Render_W2_Part1();
-	//Render_W2_Part2();
-	Render_W2_Part3();
-	
 	//@END
 	//Update SDL Surface
 	SDL_UnlockSurface(m_pBackBuffer);
@@ -64,59 +101,28 @@ void Renderer::Render()
 	SDL_UpdateWindowSurface(m_pWindow);
 }
 
-void Renderer::VertexTransformationFunction(std::vector<Mesh>& meshes) const
+void Renderer::VertexTransformationFunction(std::vector<Mesh>& meshes)
 {
 	for (Mesh& mesh : meshes)
 	{
 		mesh.vertices_out.resize(mesh.vertices.size());
 
-		const float aspectRatio{ m_Width / static_cast<float>(m_Height) };
+		Matrix wordldViewProjectionMatrix = mesh.worldMatrix * m_Camera.viewMatrix * m_Camera.projectionMatrix;
+			
+		Vector4 position{};
 
 		for (size_t index{}; index < mesh.vertices.size(); ++index)
 		{
-			//View Space
-			mesh.vertices_out[index].position = m_Camera.viewMatrix.TransformPoint(mesh.vertices[index].position);
+			position = { mesh.vertices[index].position.x,mesh.vertices[index].position.y,mesh.vertices[index].position.z,0.f };
+			mesh.vertices_out[index].position = wordldViewProjectionMatrix.TransformPoint(position);
 
-			//Perspective divide -> Projection Space
-			mesh.vertices_out[index].position.x = mesh.vertices_out[index].position.x / mesh.vertices_out[index].position.z;
-			mesh.vertices_out[index].position.y = mesh.vertices_out[index].position.y / mesh.vertices_out[index].position.z;
+			const float inverseW{ 1.f / mesh.vertices_out[index].position.w };
 
-			//Projection Stage --- Aspect Ratio
-			mesh.vertices_out[index].position.x = mesh.vertices_out[index].position.x / (aspectRatio * m_Camera.fov);
-			mesh.vertices_out[index].position.y = mesh.vertices_out[index].position.y / m_Camera.fov;
-
-			//Screen Space
-			mesh.vertices_out[index].position.x = 0.5f * (mesh.vertices_out[index].position.x + 1.f) * m_Width;
-			mesh.vertices_out[index].position.y = 0.5f * (1.f - mesh.vertices_out[index].position.y) * m_Height;
+			mesh.vertices_out[index].position.x *= inverseW;
+			mesh.vertices_out[index].position.y *= inverseW;
+			mesh.vertices_out[index].position.z *= inverseW;
+			mesh.vertices_out[index].position.w = inverseW;
 		}
-	}
-}
-
-void Renderer::VertexTransformationFunction(const std::vector<Vertex>& vertices_in, std::vector<Vertex>& vertices_out) const
-{
-	vertices_out.resize(vertices_in.size());
-
-	const float aspectRatio{ m_Width / static_cast<float>(m_Height) };
-
-	for (size_t index{}; index < vertices_in.size(); ++index)
-	{
-		vertices_out[index].color = vertices_in[index].color;
-
-		//View Space
-		vertices_out[index].position = m_Camera.viewMatrix.TransformPoint(vertices_in[index].position);
-
-		//Perspective divide -> Projection Space
-		vertices_out[index].position.x = vertices_out[index].position.x / vertices_out[index].position.z;
-		vertices_out[index].position.y = vertices_out[index].position.y / vertices_out[index].position.z;
-		
-		//Projection Stage --- Aspect Ratio
-		vertices_out[index].position.x = vertices_out[index].position.x / (aspectRatio * m_Camera.fov);
-		vertices_out[index].position.y = vertices_out[index].position.y / m_Camera.fov;
-
-		//Screen Space
-		vertices_out[index].position.x = 0.5f * (vertices_out[index].position.x + 1.f) * m_Width;
-		vertices_out[index].position.y = 0.5f * (1.f - vertices_out[index].position.y) * m_Height;
-
 	}
 }
 
@@ -125,55 +131,36 @@ bool Renderer::SaveBufferToImage() const
 	return SDL_SaveBMP(m_pBackBuffer, "Rasterizer_ColorBuffer.bmp");
 }
 
-void Renderer::Render_W2_Part3() const
+void dae::Renderer::ToggleRenderMode()
+{
+	if (m_CurrentRenderMode < RenderMode::depth)
+	{
+		m_CurrentRenderMode = static_cast<RenderMode>(static_cast<int>(m_CurrentRenderMode) + 1);
+	}
+	else
+	{
+		m_CurrentRenderMode = RenderMode::texture;
+	}
+}
+
+void Renderer::Render_W3_Part1()
 {
 	const int nrPixels{ m_Width * m_Height };
 	std::fill_n(m_pDepthBufferPixels, nrPixels, INFINITY);
 
-	SDL_FillRect(m_pBackBuffer, NULL, SDL_MapRGB(m_pBackBuffer->format, 100, 100, 100));
+	SDL_FillRect(m_pBackBuffer, NULL, SDL_MapRGB(m_pBackBuffer->format, 0, 0, 0));
 
-	std::vector<Mesh> meshes_world
+	VertexTransformationFunction(m_MeshesWorld);
+
+	for (Mesh& mesh : m_MeshesWorld)
 	{
-		Mesh
+		for (size_t index{}; index < mesh.vertices.size(); ++index)
 		{
-			{
-				Vertex{{-3.f, 3.f, -2.f},colors::White, {0,0}},
-				Vertex{{0.f, 3.f, -2.f},colors::White,  {0.5,0}},
-				Vertex{{3.f, 3.f, -2.f},colors::White,  {1,0}},
-				Vertex{{-3.f, 0.f, -2.f},colors::White, {0,0.5}},
-				Vertex{{0.f, 0.f, -2.f},colors::White,  {0.5,0.5}},
-				Vertex{{3.f, 0.f, -2.f},colors::White,  {1,0.5}},
-				Vertex{{-3.f, -3.f, -2.f},colors::White,{0,1}},
-				Vertex{{0.f, -3.f, -2.f},colors::White, {0.5,1}},
-				Vertex{{3.f, -3.f, -2.f},colors::White, {1,1}}
-			},
-
-		//1 of the 2 below indices has to be uncommitted together with the PrimitiveTropology::...
-
-		//indices for triangleList
-			{
-				3, 0, 1,    1, 4, 3,    4, 1, 2,
-				2, 5, 4,    6, 3, 4,    4, 7, 6,
-				7, 4, 5,    5, 8, 7
-			},
-
-			PrimitiveTopology::TriangleList
-
-		//indices for triangleStrip
-			//{
-			//	3, 0, 4, 1, 5, 2,
-			//	2, 6,
-			//	6, 3, 7, 4, 8, 5
-			//},
-
-			//PrimitiveTopology::TriangleStrip
+			//NDC space -> Raster space
+			mesh.vertices_out[index].position.x = 0.5f * (mesh.vertices_out[index].position.x + 1.f) * m_Width;
+			mesh.vertices_out[index].position.y = 0.5f * (1.f - mesh.vertices_out[index].position.y) * m_Height;
 		}
-	};
 
-	VertexTransformationFunction(meshes_world);
-
-	for (Mesh& mesh : meshes_world)
-	{
 		const bool isTriangleList{ mesh.primitiveTopology == PrimitiveTopology::TriangleList };
 
 		const int increment{ isTriangleList * 3 + !isTriangleList * 1 };
@@ -181,10 +168,15 @@ void Renderer::Render_W2_Part3() const
 
 		for (size_t index{}; index < maxCount; index += increment)
 		{
+			//Frustrum culling
+			if (mesh.vertices_out[mesh.indices[index]].position.z < 0.f || mesh.vertices_out[mesh.indices[index]].position.z > 1.f ||
+				mesh.vertices_out[mesh.indices[index + 1]].position.z < 0.f || mesh.vertices_out[mesh.indices[index + 1]].position.z > 1.f ||
+				mesh.vertices_out[mesh.indices[index + 2]].position.z < 0.f || mesh.vertices_out[mesh.indices[index + 2]].position.z > 1.f) continue;
+
 			if (mesh.indices[index] == mesh.indices[index + 1] || mesh.indices[index] == mesh.indices[index + 2] || mesh.indices[index + 1] == mesh.indices[index + 2]) continue;
 
 			const Vector2 v0{ mesh.vertices_out[mesh.indices[index]].position.GetXY() };
-			const Vector2 v1{ mesh.vertices_out[mesh.indices[index + 1 ]].position.GetXY() };
+			const Vector2 v1{ mesh.vertices_out[mesh.indices[index + 1]].position.GetXY() };
 			const Vector2 v2{ mesh.vertices_out[mesh.indices[index + 2]].position.GetXY() };
 
 			Vector2 min{ std::min(v0.x, v1.x),std::min(v0.y, v1.y) };
@@ -197,21 +189,36 @@ void Renderer::Render_W2_Part3() const
 
 
 			//RENDER LOGIC
-			for (int px{ std::max(0,static_cast<int>(min.x)) }; px < std::min(m_Width, static_cast<int>(max.x)); ++px)
+			for (int px{ std::max(0,static_cast<int>(min.x)) }; px <= std::min(m_Width, static_cast<int>(max.x)); ++px)
 			{
-				for (int py{ std::max(0,static_cast<int>(min.y)) }; py < std::min(m_Height, static_cast<int>(max.y)); ++py)
+				for (int py{ std::max(0,static_cast<int>(min.y)) }; py <= std::min(m_Height, static_cast<int>(max.y)); ++py)
 				{
 					Vector3 vertexRatio{};
 
+					//Rasterization
 					if (!Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio, !isTriangleList && index & 0x01)) continue;
 
+					//Attribute Interpolation
 					const float currentDepth{ 1.f / ((vertexRatio.x / mesh.vertices_out[mesh.indices[index]].position.z) + (vertexRatio.y / mesh.vertices_out[mesh.indices[index + 1]].position.z) + (vertexRatio.z / mesh.vertices_out[mesh.indices[index + 2]].position.z)) };
 
 					if (currentDepth < m_pDepthBufferPixels[px + (py * m_Width)])
 					{
 						m_pDepthBufferPixels[px + (py * m_Width)] = currentDepth;
 
-						ColorRGB finalColor{ m_pTexture->Sample((mesh.vertices[mesh.indices[index]].uv * vertexRatio.x / mesh.vertices_out[mesh.indices[index]].position.z + mesh.vertices[mesh.indices[index + 1]].uv * vertexRatio.y / mesh.vertices_out[mesh.indices[index + 1]].position.z + mesh.vertices[mesh.indices[index + 2]].uv * vertexRatio.z / mesh.vertices_out[mesh.indices[index + 2]].position.z) * currentDepth) };
+						const float wInterpolated{ 1.f / ((vertexRatio.x * mesh.vertices_out[mesh.indices[index]].position.w) + (vertexRatio.y * mesh.vertices_out[mesh.indices[index + 1]].position.w) + (vertexRatio.z * mesh.vertices_out[mesh.indices[index + 2]].position.w)) };
+
+						ColorRGB finalColor{};
+
+						switch (m_CurrentRenderMode)
+						{
+						case dae::Renderer::RenderMode::texture:
+							finalColor = m_pTexture->Sample((mesh.vertices[mesh.indices[index]].uv * vertexRatio.x * mesh.vertices_out[mesh.indices[index]].position.w + mesh.vertices[mesh.indices[index + 1]].uv * vertexRatio.y * mesh.vertices_out[mesh.indices[index + 1]].position.w + mesh.vertices[mesh.indices[index + 2]].uv * vertexRatio.z * mesh.vertices_out[mesh.indices[index + 2]].position.w) * wInterpolated);
+							break;
+						case dae::Renderer::RenderMode::depth:
+							const float remappedDepth{ Utils::Remap(currentDepth,0.995f) };
+							finalColor = ColorRGB{ remappedDepth,remappedDepth,remappedDepth };
+							break;
+						}
 
 						//Update Color in Buffer
 						finalColor.MaxToOne();
@@ -223,482 +230,6 @@ void Renderer::Render_W2_Part3() const
 					}
 				}
 			}
-		}
-	}
-}
-
-void Renderer::Render_W2_Part2() const
-{
-	const int nrPixels{ m_Width * m_Height };
-	std::fill_n(m_pDepthBufferPixels, nrPixels, INFINITY);
-
-	SDL_FillRect(m_pBackBuffer, NULL, SDL_MapRGB(m_pBackBuffer->format, 100, 100, 100));
-
-	std::vector<Mesh> meshes_world
-	{
-		Mesh
-		{
-			{
-				Vertex{{-3.f, 3.f, -2.f},colors::White, {0,0}},
-				Vertex{{0.f, 3.f, -2.f},colors::White,  {0.5,0}},
-				Vertex{{3.f, 3.f, -2.f},colors::White,  {1,0}},
-				Vertex{{-3.f, 0.f, -2.f},colors::White, {0,0.5}},
-				Vertex{{0.f, 0.f, -2.f},colors::White,  {0.5,0.5}},
-				Vertex{{3.f, 0.f, -2.f},colors::White,  {1,0.5}},
-				Vertex{{-3.f, -3.f, -2.f},colors::White,{0,1}},
-				Vertex{{0.f, -3.f, -2.f},colors::White, {0.5,1}},
-				Vertex{{3.f, -3.f, -2.f},colors::White, {1,1}}
-			},
-
-		//1 of the 2 below indices has to be uncommitted together with the PrimitiveTropology::...
-
-		//indices for triangleList
-			//{
-			//	3, 0, 1,    1, 4, 3,    4, 1, 2,
-			//	2, 5, 4,    6, 3, 4,    4, 7, 6,
-			//	7, 4, 5,    5, 8, 7
-			//},
-
-			//PrimitiveTopology::TriangleList
-
-		//indices for triangleStrip
-			{
-				3, 0, 4, 1, 5, 2,
-				2, 6,
-				6, 3, 7, 4, 8, 5
-			},
-
-			PrimitiveTopology::TriangleStrip
-		}
-	};
-
-	VertexTransformationFunction(meshes_world);
-
-	for (Mesh& mesh : meshes_world)
-	{
-		const int increment{ mesh.primitiveTopology == PrimitiveTopology::TriangleList ? 3 : 1 };
-		const int maxCount{ mesh.primitiveTopology == PrimitiveTopology::TriangleList ? static_cast<int>(mesh.indices.size()) : static_cast<int>(mesh.indices.size()) - 2 };
-
-		for (size_t index{}; index < maxCount; index += increment)
-		{
-			if (mesh.indices[index] == mesh.indices[index + 1] || mesh.indices[index] == mesh.indices[index + 2] || mesh.indices[index + 1] == mesh.indices[index + 2]) continue;
-
-			const Vector2 v0{ mesh.vertices_out[mesh.indices[index]].position.GetXY() };
-			const Vector2 v1{ mesh.vertices_out[mesh.indices[index + 1]].position.GetXY() };
-			const Vector2 v2{ mesh.vertices_out[mesh.indices[index + 2]].position.GetXY() };
-
-			Vector2 min{ std::min(v0.x, v1.x),std::min(v0.y, v1.y) };
-			min.x = std::min(min.x, v2.x);
-			min.y = std::min(min.y, v2.y);
-
-			Vector2 max{ std::max(v0.x, v1.x),std::max(v0.y, v1.y) };
-			max.x = std::max(max.x, v2.x);
-			max.y = std::max(max.y, v2.y);
-
-
-			//RENDER LOGIC
-			for (int px{}; px < m_Width; ++px)
-			{
-				if (px >= min.x && px <= max.x)
-				{
-					for (int py{}; py < m_Height; ++py)
-					{
-						if (py >= min.y && py <= max.y)
-						{
-							Vector3 vertexRatio{};
-
-							if (increment == 1 && index & 0x01)
-							{
-								if (!Utils::HitTest_TriangleOdd(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio)) continue;
-							}
-							else
-							{
-								if (!Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio)) continue;
-							}
-
-							const float currentDepth{ mesh.vertices_out[mesh.indices[index]].position.z * vertexRatio.x + mesh.vertices_out[mesh.indices[index + 1]].position.z * vertexRatio.y + mesh.vertices_out[mesh.indices[index + 2]].position.z * vertexRatio.z };
-
-							if (currentDepth < m_pDepthBufferPixels[px + (py * m_Width)])
-							{
-								m_pDepthBufferPixels[px + (py * m_Width)] = currentDepth;
-
-								ColorRGB finalColor{ m_pTexture->Sample(mesh.vertices[mesh.indices[index]].uv * vertexRatio.x + mesh.vertices[mesh.indices[index + 1]].uv * vertexRatio.y + mesh.vertices[mesh.indices[index + 2]].uv * vertexRatio.z) };
-
-								//Update Color in Buffer
-								finalColor.MaxToOne();
-
-								m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-									static_cast<uint8_t>(finalColor.m_pRed * 255),
-									static_cast<uint8_t>(finalColor.m_pGreen * 255),
-									static_cast<uint8_t>(finalColor.m_pBlue * 255));
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-void Renderer::Render_W2_Part1() const
-{
-	const int nrPixels{ m_Width * m_Height };
-	std::fill_n(m_pDepthBufferPixels, nrPixels, INFINITY);
-
-	SDL_FillRect(m_pBackBuffer, NULL, SDL_MapRGB(m_pBackBuffer->format, 100, 100, 100));
-
-	std::vector<Mesh> meshes_world
-	{
-		Mesh
-		{
-			{
-				Vertex{{-3.f, 3.f, -2.f}},
-				Vertex{{0.f, 3.f, -2.f}},
-				Vertex{{3.f, 3.f, -2.f}},
-				Vertex{{-3.f, 0.f, -2.f}},
-				Vertex{{0.f, 0.f, -2.f}},
-				Vertex{{3.f, 0.f, -2.f}},
-				Vertex{{-3.f, -3.f, -2.f}},
-				Vertex{{0.f, -3.f, -2.f}},
-				Vertex{{3.f, -3.f, -2.f}}
-			},
-
-		//1 of the 2 below indices has to be uncommitted together with the PrimitiveTropology::...
-
-		//indices for triangleList
-			//{
-			//	3, 0, 1,    1, 4, 3,    4, 1, 2,
-			//	2, 5, 4,    6, 3, 4,    4, 7, 6,
-			//	7, 4, 5,    5, 8, 7
-			//},
-
-			//PrimitiveTopology::TriangleList
-
-		//indices for triangleStrip
-			{
-				3, 0, 4, 1, 5, 2,
-				2, 6,
-				6, 3, 7, 4, 8, 5
-			},
-
-			PrimitiveTopology::TriangleStrip
-		}
-	};
-
-	VertexTransformationFunction(meshes_world);
-
-	for (Mesh& mesh : meshes_world)
-	{
-		const int increment{ mesh.primitiveTopology == PrimitiveTopology::TriangleList ? 3 : 1 };
-		const int maxCount{ mesh.primitiveTopology == PrimitiveTopology::TriangleList ? static_cast<int>(mesh.indices.size()) : static_cast<int>(mesh.indices.size()) - 2 };
-
-		for (size_t index{}; index < maxCount; index += increment)
-		{
-			const Vector2 v0{ mesh.vertices_out[mesh.indices[index]].position.GetXY() };
-			const Vector2 v1{ mesh.vertices_out[mesh.indices[index + 1]].position.GetXY() };
-			const Vector2 v2{ mesh.vertices_out[mesh.indices[index + 2]].position.GetXY() };
-
-			Vector2 min{ std::min(v0.x, v1.x),std::min(v0.y, v1.y) };
-			min.x = std::min(min.x, v2.x);
-			min.y = std::min(min.y, v2.y);
-
-			Vector2 max{ std::max(v0.x, v1.x),std::max(v0.y, v1.y) };
-			max.x = std::max(max.x, v2.x);
-			max.y = std::max(max.y, v2.y);
-
-
-			//RENDER LOGIC
-			for (int px{}; px < m_Width; ++px)
-			{
-				if (px >= min.x && px <= max.x)
-				{
-					for (int py{}; py < m_Height; ++py)
-					{
-						if (py >= min.y && py <= max.y)
-						{
-							Vector3 vertexRatio{};
-
-							if (index & 0x01 && increment == 1)
-							{
-								if (!Utils::HitTest_TriangleOdd(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio)) continue;
-							}
-							else
-							{
-								if (!Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio)) continue;
-							}
-
-							float currentDepth = mesh.vertices_out[mesh.indices[index]].position.z * vertexRatio.x + mesh.vertices_out[mesh.indices[index + 1]].position.z * vertexRatio.y + mesh.vertices_out[mesh.indices[index + 2]].position.z * vertexRatio.z;
-
-							if (currentDepth < m_pDepthBufferPixels[px + (py * m_Width)])
-							{
-
-								m_pDepthBufferPixels[px + (py * m_Width)] = currentDepth;
-
-								ColorRGB finalColor{ mesh.vertices[mesh.indices[index]].color * vertexRatio.x + mesh.vertices[mesh.indices[index + 1]].color * vertexRatio.y + mesh.vertices[mesh.indices[index + 2]].color * vertexRatio.z };
-
-								//Update Color in Buffer
-								finalColor.MaxToOne();
-
-								m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-									static_cast<uint8_t>(finalColor.m_pRed * 255),
-									static_cast<uint8_t>(finalColor.m_pGreen * 255),
-									static_cast<uint8_t>(finalColor.m_pBlue * 255));
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-void Renderer::Render_W1_Part5() const
-{
-	const int nrPixels{ m_Width * m_Height };
-	std::fill_n(m_pDepthBufferPixels, nrPixels, INFINITY);
-
-	SDL_FillRect(m_pBackBuffer, NULL, SDL_MapRGB(m_pBackBuffer->format, 100, 100, 100));
-
-	std::vector<Vertex> vertices_world
-	{
-		//Triangle 0
-		{ {0.f,2.f,0.f},    {1,0,0} },
-		{ {1.5f,-1.f,0.f},  {1,0,0} },
-		{ {-1.5f,-1.f,0.f}, {1,0,0} },
-
-		//Triangle 1
-		{ {0.f,4.f,2.f},   {1,0,0} },
-		{ {3.f,-2.f,2.f},  {0,1,0} },
-		{ {-3.f,-2.f,2.f}, {0,0,1} }
-	};
-
-	std::vector<Vertex> vertices_screen{};
-
-	VertexTransformationFunction(vertices_world, vertices_screen);
-
-	for (size_t index{}; index < vertices_screen.size(); index += 3)
-	{
-		const Vector2 v0{ vertices_screen[index].position.GetXY() };
-		const Vector2 v1{ vertices_screen[index + 1].position.GetXY() };
-		const Vector2 v2{ vertices_screen[index + 2].position.GetXY() };
-
-		Vector2 min{ std::min(v0.x, v1.x),std::min(v0.y, v1.y) };
-		min.x = std::min(min.x, v2.x);
-		min.y = std::min(min.y, v2.y);
-
-		Vector2 max{ std::max(v0.x, v1.x),std::max(v0.y, v1.y) };
-		max.x = std::max(max.x, v2.x);
-		max.y = std::max(max.y, v2.y);
-
-
-		//RENDER LOGIC
-		for (int px{}; px < m_Width; ++px)
-		{
-			if (px > min.x && px < max.x)
-			{
-				for (int py{}; py < m_Height; ++py)
-				{
-					if (py > min.y && py < max.y)
-					{
-						Vector3 vertexRatio{};
-
-						if (Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio))
-						{
-
-							float currentDepth = vertices_screen[index].position.z * vertexRatio.x + vertices_screen[index + 1].position.z * vertexRatio.y + vertices_screen[index + 2].position.z * vertexRatio.z;
-
-							if (currentDepth < m_pDepthBufferPixels[px + (py * m_Width)])
-							{
-
-								m_pDepthBufferPixels[px + (py * m_Width)] = currentDepth;
-
-								ColorRGB finalColor{ vertices_screen[index].color * vertexRatio.x + vertices_screen[index + 1].color * vertexRatio.y + vertices_screen[index + 2].color * vertexRatio.z };
-
-								//Update Color in Buffer
-								finalColor.MaxToOne();
-
-								m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-									static_cast<uint8_t>(finalColor.m_pRed * 255),
-									static_cast<uint8_t>(finalColor.m_pGreen * 255),
-									static_cast<uint8_t>(finalColor.m_pBlue * 255));
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-void Renderer::Render_W1_Part4() const
-{
-	const int nrPixels{ m_Width * m_Height };
-	std::fill_n(m_pDepthBufferPixels, nrPixels, INFINITY);
-
-	SDL_FillRect(m_pBackBuffer, NULL, SDL_MapRGB(m_pBackBuffer->format, 100, 100, 100));
-
-	std::vector<Vertex> vertices_world
-	{
-		//Triangle 0
-		{ {0.f,2.f,0.f},    {1,0,0} },
-		{ {1.5f,-1.f,0.f},  {1,0,0} },
-		{ {-1.5f,-1.f,0.f}, {1,0,0} },
-
-		//Triangle 1
-		{ {0.f,4.f,2.f},   {1,0,0} },
-		{ {3.f,-2.f,2.f},  {0,1,0} },
-		{ {-3.f,-2.f,2.f}, {0,0,1} }
-	};
-
-	std::vector<Vertex> vertices_screen{};
-
-	VertexTransformationFunction(vertices_world, vertices_screen);
-
-	for (size_t index{}; index < vertices_screen.size(); index += 3)
-	{
-		const Vector2 v0{ vertices_screen[index].position.GetXY() };
-		const Vector2 v1{ vertices_screen[index + 1].position.GetXY() };
-		const Vector2 v2{ vertices_screen[index + 2].position.GetXY() };
-
-		//RENDER LOGIC
-		for (int px{}; px < m_Width; ++px)
-		{
-			for (int py{}; py < m_Height; ++py)
-			{
-				Vector3 vertexRatio{};
-
-				if (Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio))
-				{
-
-					float currentDepth = vertices_screen[index].position.z * vertexRatio.x + vertices_screen[index + 1].position.z * vertexRatio.y + vertices_screen[index + 2].position.z * vertexRatio.z;
-
-					if (currentDepth < m_pDepthBufferPixels[px + (py * m_Width)])
-					{
-
-						m_pDepthBufferPixels[px + (py * m_Width)] = currentDepth;
-
-						ColorRGB finalColor{ vertices_screen[index].color * vertexRatio.x + vertices_screen[index + 1].color * vertexRatio.y + vertices_screen[index + 2].color * vertexRatio.z };
-
-						//Update Color in Buffer
-						finalColor.MaxToOne();
-
-						m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-							static_cast<uint8_t>(finalColor.m_pRed * 255),
-							static_cast<uint8_t>(finalColor.m_pGreen * 255),
-							static_cast<uint8_t>(finalColor.m_pBlue * 255));
-					}
-				}
-
-			}
-		}
-	}
-}
-
-void Renderer::Render_W1_Part3() const
-{
-	std::vector<Vertex> vertices_world{ { {0.f,4.f,2.f},{1,0,0} },{ {3.f,-2.f,2.f}, {0,1,0} },{ {-3.f,-2.f,2.f}, {0,0,1} } };
-	std::vector<Vertex> vertices_screen{};
-
-	VertexTransformationFunction(vertices_world, vertices_screen);
-
-	const Vector2 v0{ vertices_screen[0].position.GetXY() };
-	const Vector2 v1{ vertices_screen[1].position.GetXY() };
-	const Vector2 v2{ vertices_screen[2].position.GetXY() };
-
-	//RENDER LOGIC
-	for (int px{}; px < m_Width; ++px)
-	{
-		for (int py{}; py < m_Height; ++py)
-		{
-
-
-			Vector3 colorRatio{};
-			ColorRGB finalColor{};
-
-			if (Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, colorRatio))
-			{
-				finalColor = vertices_screen[0].color * colorRatio.x + vertices_screen[1].color * colorRatio.y + vertices_screen[2].color * colorRatio.z;
-			}
-
-			//Update Color in Buffer
-			finalColor.MaxToOne();
-
-			m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-				static_cast<uint8_t>(finalColor.m_pRed * 255),
-				static_cast<uint8_t>(finalColor.m_pGreen * 255),
-				static_cast<uint8_t>(finalColor.m_pBlue * 255));
-		}
-	}
-}
-
-void Renderer::Render_W1_Part2() const
-{
-	std::vector<Vertex> vertices_world{ {{0.f,2.f,0.f}},{{1.f,0.f,0.f}},{{-1.f,0.f,0.f}} };
-	std::vector<Vertex> vertices_screen{};
-
-	VertexTransformationFunction(vertices_world, vertices_screen);
-
-	const Vector2 v0{ vertices_screen[0].position.GetXY() };
-	const Vector2 v1{ vertices_screen[1].position.GetXY() };
-	const Vector2 v2{ vertices_screen[2].position.GetXY() };
-
-	//RENDER LOGIC
-	for (int px{}; px < m_Width; ++px)
-	{
-		for (int py{}; py < m_Height; ++py)
-		{
-
-
-			Vector3 colorRatio{};
-			ColorRGB finalColor{};
-
-			if (Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, colorRatio))
-			{
-				 finalColor = vertices_screen[0].color * colorRatio.x + vertices_screen[1].color * colorRatio.y + vertices_screen[2].color * colorRatio.z;
-			}
-
-			//Update Color in Buffer
-			finalColor.MaxToOne();
-
-			m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-			static_cast<uint8_t>(finalColor.m_pRed * 255),
-			static_cast<uint8_t>(finalColor.m_pGreen * 255),
-			static_cast<uint8_t>(finalColor.m_pBlue * 255));
-		}
-	}
-}
-
-void Renderer::Render_W1_Part1() const
-{
-	std::vector<Vector3> vertices_ndc{ {0.f,0.5f,1.f},{0.5f,-0.5f,1.f},{-0.5f,-0.5f,1.f} };
-
-	//RENDER LOGIC
-	for (int px{}; px < m_Width; ++px)
-	{
-		for (int py{}; py < m_Height; ++py)
-		{
-			Vector2 v0{ 0.5f * (vertices_ndc[0].x + 1.f) * m_Width, 0.5f * (1.f - vertices_ndc[0].y) * m_Height };
-			Vector2 v1{ 0.5f * (vertices_ndc[1].x + 1.f) * m_Width, 0.5f * (1.f - vertices_ndc[1].y) * m_Height };
-			Vector2 v2{ 0.5f * (vertices_ndc[2].x + 1.f) * m_Width, 0.5f * (1.f - vertices_ndc[2].y) * m_Height };
-
-			Vector3 colorRatio{};
-			float gradient = 0.f;
-
-			if (Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2,colorRatio))
-			{
-				gradient = 1.f;
-			}
-
-			ColorRGB finalColor{ gradient, gradient, gradient };
-
-			//Update Color in Buffer
-			finalColor.MaxToOne();
-
-			m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-				static_cast<uint8_t>(finalColor.m_pRed * 255),
-				static_cast<uint8_t>(finalColor.m_pGreen * 255),
-				static_cast<uint8_t>(finalColor.m_pBlue * 255));
-
 		}
 	}
 }
