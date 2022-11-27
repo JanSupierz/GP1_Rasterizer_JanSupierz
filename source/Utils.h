@@ -35,14 +35,6 @@ namespace dae
 			return true;
 		}
 
-		float Remap(float depthValue, const float low = 0.985f, const float high = 1.f)
-		{
-			if (depthValue < low) depthValue = low;
-			else if (depthValue > high) depthValue = high;
-
-			return 	(depthValue - low) / (high - low);
-		}
-
 		//Just parses vertices and indices
 #pragma warning(push)
 #pragma warning(disable : 4505) //Warning unreferenced local function

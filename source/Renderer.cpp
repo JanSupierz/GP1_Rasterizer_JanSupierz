@@ -189,9 +189,9 @@ void Renderer::Render_W3_Part1()
 
 
 			//RENDER LOGIC
-			for (int px{ std::max(0,static_cast<int>(min.x)) }; px <= std::min(m_Width, static_cast<int>(max.x)); ++px)
+			for (int px{ std::max(0,static_cast<int>(min.x)) }; px <= std::min(m_Width - 1, static_cast<int>(max.x)); ++px)
 			{
-				for (int py{ std::max(0,static_cast<int>(min.y)) }; py <= std::min(m_Height, static_cast<int>(max.y)); ++py)
+				for (int py{ std::max(0,static_cast<int>(min.y)) }; py <= std::min(m_Height - 1, static_cast<int>(max.y)); ++py)
 				{
 					Vector3 vertexRatio{};
 
@@ -215,7 +215,7 @@ void Renderer::Render_W3_Part1()
 							finalColor = m_pTexture->Sample((mesh.vertices[mesh.indices[index]].uv * vertexRatio.x * mesh.vertices_out[mesh.indices[index]].position.w + mesh.vertices[mesh.indices[index + 1]].uv * vertexRatio.y * mesh.vertices_out[mesh.indices[index + 1]].position.w + mesh.vertices[mesh.indices[index + 2]].uv * vertexRatio.z * mesh.vertices_out[mesh.indices[index + 2]].position.w) * wInterpolated);
 							break;
 						case dae::Renderer::RenderMode::depth:
-							const float remappedDepth{ Utils::Remap(currentDepth,0.995f) };
+							const float remappedDepth{ Remap(currentDepth,0.995f) };
 							finalColor = ColorRGB{ remappedDepth,remappedDepth,remappedDepth };
 							break;
 						}
