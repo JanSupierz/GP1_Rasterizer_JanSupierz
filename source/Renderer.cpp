@@ -25,65 +25,39 @@ Renderer::Renderer(SDL_Window* pWindow) :
 	m_pDepthBufferPixels = new float[m_Width * m_Height];
 
 	//Initialize Camera
-	m_Camera.Initialize(60.f, { .0f,5.f,-30.f }, m_Width / static_cast<float>(m_Height));
-
-	//m_pTexture = Texture::LoadFromFile("Resources/uv_grid_2.png");
-
-	//m_MeshesWorld = 
-	//{
-	//	Mesh
-	//	{
-	//		{
-	//			Vertex{{-3.f, 3.f, -2.f},colors::White, {0,0}},
-	//			Vertex{{0.f, 3.f, -2.f},colors::White,  {0.5,0}},
-	//			Vertex{{3.f, 3.f, -2.f},colors::White,  {1,0}},
-	//			Vertex{{-3.f, 0.f, -2.f},colors::White, {0,0.5}},
-	//			Vertex{{0.f, 0.f, -2.f},colors::White,  {0.5,0.5}},
-	//			Vertex{{3.f, 0.f, -2.f},colors::White,  {1,0.5}},
-	//			Vertex{{-3.f, -3.f, -2.f},colors::White,{0,1}},
-	//			Vertex{{0.f, -3.f, -2.f},colors::White, {0.5,1}},
-	//			Vertex{{3.f, -3.f, -2.f},colors::White, {1,1}}
-	//		},
-
-	//	//indices for triangleList
-	//		{
-	//			3, 0, 1,    1, 4, 3,    4, 1, 2,
-	//			2, 5, 4,    6, 3, 4,    4, 7, 6,
-	//			7, 4, 5,    5, 8, 7
-	//		},
-
-	//		PrimitiveTopology::TriangleList
-
-	//	//indices for triangleStrip
-	//		//{
-	//		//	3, 0, 4, 1, 5, 2,
-	//		//	2, 6,
-	//		//	6, 3, 7, 4, 8, 5
-	//		//},
-
-	//		//PrimitiveTopology::TriangleStrip
-	//	}
-	//};
+	m_Camera.Initialize(45.f, { 0.f,0.f,0.f }, m_Width / static_cast<float>(m_Height));
 
 	m_MeshesWorld = { Mesh{} };
 
-	m_pTexture = Texture::LoadFromFile("Resources/tuktuk.png");
+	m_pDiffuseTexture = Texture::LoadFromFile("Resources/vehicle_diffuse.png");
+	m_pNormalTexture = Texture::LoadFromFile("Resources/vehicle_normal.png");
+	m_pGlossTexture = Texture::LoadFromFile("Resources/vehicle_gloss.png");
+	m_pSpecularTexture = Texture::LoadFromFile("Resources/vehicle_specular.png");
 
 	m_MeshesWorld[0].primitiveTopology = PrimitiveTopology::TriangleList;
-	Utils::ParseOBJ("Resources/tuktuk.obj", m_MeshesWorld[0].vertices, m_MeshesWorld[0].indices);
+	Utils::ParseOBJ("Resources/vehicle.obj", m_MeshesWorld[0].vertices, m_MeshesWorld[0].indices);
 }
 
 Renderer::~Renderer()
 {
 	delete[] m_pDepthBufferPixels;
-	delete m_pTexture;
+
+	delete m_pSpecularTexture;
+	delete m_pNormalTexture;
+	delete m_pGlossTexture;
+	delete m_pDiffuseTexture;
 }
 
 void Renderer::Update(Timer* pTimer)
 {
 	m_Camera.Update(pTimer);
 
-	m_MeshesWorld[0].worldMatrix = Matrix::CreateRotationY(pTimer->GetTotal());
+	if (m_ShouldRotate)
+	{
+		m_RotationAngle += pTimer->GetElapsed();
+
+		m_MeshesWorld[0].worldMatrix = Matrix::CreateRotationY(m_RotationAngle) * Matrix::CreateTranslation(0.f, 0.f, 50.f);
+	}
 }
 
 void Renderer::Render()
@@ -107,7 +81,7 @@ void Renderer::VertexTransformationFunction(std::vector<Mesh>& meshes)
 	{
 		mesh.vertices_out.resize(mesh.vertices.size());
 
-		Matrix wordldViewProjectionMatrix = mesh.worldMatrix * m_Camera.viewMatrix * m_Camera.projectionMatrix;
+		const Matrix wordldViewProjectionMatrix{ mesh.worldMatrix * m_Camera.viewMatrix * m_Camera.projectionMatrix };
 			
 		Vector4 position{};
 
@@ -118,10 +92,18 @@ void Renderer::VertexTransformationFunction(std::vector<Mesh>& meshes)
 
 			const float inverseW{ 1.f / mesh.vertices_out[index].position.w };
 
+			//Positions
 			mesh.vertices_out[index].position.x *= inverseW;
 			mesh.vertices_out[index].position.y *= inverseW;
 			mesh.vertices_out[index].position.z *= inverseW;
 			mesh.vertices_out[index].position.w = inverseW;
+
+			//Normals
+			mesh.vertices_out[index].normal = mesh.worldMatrix.TransformVector(mesh.vertices[index].normal).Normalized();
+			mesh.vertices_out[index].tangent = mesh.worldMatrix.TransformVector(mesh.vertices[index].tangent).Normalized();
+
+			//View
+			mesh.vertices_out[index].viewDirection = mesh.worldMatrix.TransformPoint(mesh.vertices[index].position) - m_Camera.origin;
 		}
 	}
 }
@@ -133,14 +115,24 @@ bool Renderer::SaveBufferToImage() const
 
 void dae::Renderer::ToggleRenderMode()
 {
-	if (m_CurrentRenderMode < RenderMode::depth)
+	if (m_CurrentRenderMode < RenderMode::Combined)
 	{
 		m_CurrentRenderMode = static_cast<RenderMode>(static_cast<int>(m_CurrentRenderMode) + 1);
 	}
 	else
 	{
-		m_CurrentRenderMode = RenderMode::texture;
+		m_CurrentRenderMode = RenderMode::ObservedArea;
 	}
+}
+
+void dae::Renderer::ToggleRotation()
+{
+	m_ShouldRotate = !m_ShouldRotate;
+}
+
+void dae::Renderer::ToggleNormalMap()
+{
+	m_UseNormalMap = !m_UseNormalMap;
 }
 
 void Renderer::Render_W3_Part1()
@@ -148,7 +140,7 @@ void Renderer::Render_W3_Part1()
 	const int nrPixels{ m_Width * m_Height };
 	std::fill_n(m_pDepthBufferPixels, nrPixels, INFINITY);
 
-	SDL_FillRect(m_pBackBuffer, NULL, SDL_MapRGB(m_pBackBuffer->format, 0, 0, 0));
+	SDL_FillRect(m_pBackBuffer, NULL, SDL_MapRGB(m_pBackBuffer->format, 100, 100, 100));
 
 	VertexTransformationFunction(m_MeshesWorld);
 
@@ -207,29 +199,91 @@ void Renderer::Render_W3_Part1()
 
 						const float wInterpolated{ 1.f / ((vertexRatio.x * mesh.vertices_out[mesh.indices[index]].position.w) + (vertexRatio.y * mesh.vertices_out[mesh.indices[index + 1]].position.w) + (vertexRatio.z * mesh.vertices_out[mesh.indices[index + 2]].position.w)) };
 
-						ColorRGB finalColor{};
-
-						switch (m_CurrentRenderMode)
+						Vertex_Out pixel
 						{
-						case dae::Renderer::RenderMode::texture:
-							finalColor = m_pTexture->Sample((mesh.vertices[mesh.indices[index]].uv * vertexRatio.x * mesh.vertices_out[mesh.indices[index]].position.w + mesh.vertices[mesh.indices[index + 1]].uv * vertexRatio.y * mesh.vertices_out[mesh.indices[index + 1]].position.w + mesh.vertices[mesh.indices[index + 2]].uv * vertexRatio.z * mesh.vertices_out[mesh.indices[index + 2]].position.w) * wInterpolated);
-							break;
-						case dae::Renderer::RenderMode::depth:
-							const float remappedDepth{ Remap(currentDepth,0.995f) };
-							finalColor = ColorRGB{ remappedDepth,remappedDepth,remappedDepth };
-							break;
-						}
+							Vector4//position
+							{
+								static_cast<float>(px),
+								static_cast<float>(py),
+								currentDepth,
+								wInterpolated
+							},
+							ColorRGB //color
+							{
+								(mesh.vertices[mesh.indices[index]].color * vertexRatio.x * mesh.vertices_out[mesh.indices[index]].position.w + mesh.vertices[mesh.indices[index + 1]].color * vertexRatio.y * mesh.vertices_out[mesh.indices[index + 1]].position.w + mesh.vertices[mesh.indices[index + 2]].color * vertexRatio.z * mesh.vertices_out[mesh.indices[index + 2]].color) * wInterpolated
+							},
+							Vector2 //uv
+							{
+								(mesh.vertices[mesh.indices[index]].uv * vertexRatio.x * mesh.vertices_out[mesh.indices[index]].position.w + mesh.vertices[mesh.indices[index + 1]].uv * vertexRatio.y * mesh.vertices_out[mesh.indices[index + 1]].position.w + mesh.vertices[mesh.indices[index + 2]].uv * vertexRatio.z * mesh.vertices_out[mesh.indices[index + 2]].position.w) * wInterpolated
+							},
+							Vector3 //normal
+							{
+								((mesh.vertices_out[mesh.indices[index]].normal * vertexRatio.x * mesh.vertices_out[mesh.indices[index]].position.w + mesh.vertices_out[mesh.indices[index + 1]].normal * vertexRatio.y * mesh.vertices_out[mesh.indices[index + 1]].position.w + mesh.vertices_out[mesh.indices[index + 2]].normal * vertexRatio.z * mesh.vertices_out[mesh.indices[index + 2]].position.w) * wInterpolated).Normalized()
+							},
+							Vector3 //tangent
+							{
+								((mesh.vertices_out[mesh.indices[index]].tangent * vertexRatio.x * mesh.vertices_out[mesh.indices[index]].position.w + mesh.vertices_out[mesh.indices[index + 1]].tangent * vertexRatio.y * mesh.vertices_out[mesh.indices[index + 1]].position.w + mesh.vertices_out[mesh.indices[index + 2]].tangent * vertexRatio.z * mesh.vertices_out[mesh.indices[index + 2]].position.w) * wInterpolated).Normalized()
+							},
+							Vector3 //viewDirection
+							{
+								((mesh.vertices_out[mesh.indices[index]].viewDirection * vertexRatio.x * mesh.vertices_out[mesh.indices[index]].position.w + mesh.vertices_out[mesh.indices[index + 1]].viewDirection * vertexRatio.y * mesh.vertices_out[mesh.indices[index + 1]].position.w + mesh.vertices_out[mesh.indices[index + 2]].viewDirection * vertexRatio.z * mesh.vertices_out[mesh.indices[index + 2]].position.w) * wInterpolated).Normalized()
+							}
+						};
 
-						//Update Color in Buffer
-						finalColor.MaxToOne();
-
-						m_pBackBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
-							static_cast<uint8_t>(finalColor.m_pRed * 255),
-							static_cast<uint8_t>(finalColor.m_pGreen * 255),
-							static_cast<uint8_t>(finalColor.m_pBlue * 255));
+						PixelShading(pixel);
 					}
 				}
 			}
 		}
 	}
+}
+
+void Renderer::PixelShading(const Vertex_Out& v)
+{
+	ColorRGB finalColor{};
+
+	const Vector3 binominal{ Vector3::Cross(v.normal,v.tangent) };
+	const Matrix tangentSpaceAxis{ v.tangent,binominal,v.normal,Vector3::Zero };
+
+	const ColorRGB normalMapSample{ m_pNormalTexture->Sample(v.uv) };
+
+	Vector3 sampledNormal{ 2.f * normalMapSample.m_pRed - 1.f,2.f * normalMapSample.m_pGreen - 1.f,2.f * normalMapSample.m_pBlue - 1.f };
+	sampledNormal = (m_UseNormalMap ? tangentSpaceAxis.TransformVector(sampledNormal).Normalized() : v.normal);
+
+	const float observedArea{ Vector3::Dot(sampledNormal,-m_LightDirection) };
+
+	if (observedArea > 0.f)
+	{
+		const ColorRGB diffuse{ (m_LightIntensity * m_pDiffuseTexture->Sample(v.uv)) / PI };
+
+		ColorRGB specular{ (m_pSpecularTexture->Sample(v.uv)) * powf(std::max(Vector3::Dot(-m_LightDirection - (2.f * std::max(Vector3::Dot(sampledNormal, -m_LightDirection), 0.f) * sampledNormal), v.viewDirection), 0.f), m_Shininess * m_pGlossTexture->Sample(v.uv).m_pRed) };
+
+		specular.m_pRed = std::max(0.f, specular.m_pRed);
+		specular.m_pGreen = std::max(0.f, specular.m_pGreen);
+		specular.m_pBlue = std::max(0.f, specular.m_pBlue);
+
+		switch (m_CurrentRenderMode)
+		{
+		case dae::Renderer::RenderMode::Combined:
+			finalColor = observedArea * (diffuse + specular + m_Ambient);
+			break;
+		case dae::Renderer::RenderMode::ObservedArea:
+			finalColor = { observedArea,observedArea,observedArea };
+			break;
+		case dae::Renderer::RenderMode::Diffuse:
+			finalColor = observedArea * diffuse;
+			break;
+		case dae::Renderer::RenderMode::Specular:
+			finalColor = observedArea * specular;
+			break;
+		}
+	}
+
+	//Update Color in Buffer
+	finalColor.MaxToOne();
+
+	m_pBackBufferPixels[static_cast<int>(v.position.x) + (static_cast<int>(v.position.y) * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
+		static_cast<uint8_t>(finalColor.m_pRed * 255),
+		static_cast<uint8_t>(finalColor.m_pGreen * 255),
+		static_cast<uint8_t>(finalColor.m_pBlue * 255));
 }

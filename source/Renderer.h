@@ -34,6 +34,8 @@ namespace dae
 		bool SaveBufferToImage() const;
 
 		void ToggleRenderMode();
+		void ToggleRotation();
+		void ToggleNormalMap();
 
 	private:
 		SDL_Window* m_pWindow{};
@@ -46,19 +48,39 @@ namespace dae
 
 		Camera m_Camera{};
 
-		Texture* m_pTexture;
+		//Textures
+		Texture* m_pDiffuseTexture;
+		Texture* m_pGlossTexture;
+		Texture* m_pNormalTexture;
+		Texture* m_pSpecularTexture;
 
+		//Shading
+		const Vector3 m_LightDirection{ 0.577f,-0.577f,0.577f };
+		const float m_LightIntensity{ 7.f };
+		const float m_Shininess{ 25.f };
+		const ColorRGB m_Ambient{ 0.025f,0.025f,0.025f };
+
+		//Window Size
 		int m_Width{};
 		int m_Height{};
 
 		std::vector<Mesh> m_MeshesWorld;
 
-		enum class RenderMode { texture, depth };
-		RenderMode m_CurrentRenderMode{ RenderMode::texture };
+		//Rotation
+		bool m_ShouldRotate{ true };
+		float m_RotationAngle{};
+
+		//Normal Map
+		bool m_UseNormalMap{ true };
+
+		enum class RenderMode { ObservedArea, Diffuse, Specular, Combined };
+		RenderMode m_CurrentRenderMode{ RenderMode::Combined };
 
 		//Function that transforms the vertices from the mesh from World space to Screen space
 		void VertexTransformationFunction(std::vector<Mesh>& meshes); //W2 version
 
 		void Render_W3_Part1();
+
+		void PixelShading(const Vertex_Out& v);
 	};
 }
