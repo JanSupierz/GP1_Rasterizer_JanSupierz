@@ -55,7 +55,6 @@ void Renderer::Update(Timer* pTimer)
 	if (m_ShouldRotate)
 	{
 		m_RotationAngle += pTimer->GetElapsed();
-
 		m_MeshesWorld[0].worldMatrix = Matrix::CreateRotationY(m_RotationAngle) * Matrix::CreateTranslation(0.f, 0.f, 50.f);
 	}
 }
@@ -185,10 +184,17 @@ void Renderer::Render_W3_Part1()
 			{
 				for (int py{ std::max(0,static_cast<int>(min.y)) }; py <= std::min(m_Height - 1, static_cast<int>(max.y)); ++py)
 				{
+					/*m_pBackBufferPixels[static_cast<int>(px) + (static_cast<int>(py) * m_Width)] = SDL_MapRGB(m_pBackBuffer->format,
+						static_cast<uint8_t>(255),
+						static_cast<uint8_t>(255),
+						static_cast<uint8_t>(255));			// boundingbox visualization
+					continue;*/
+
 					Vector3 vertexRatio{};
 
 					//Rasterization
-					if (!Utils::HitTest_Triangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio, !isTriangleList && index & 0x01)) continue;
+					if (!Utils::IsPixelInTriangle(Vector2{ static_cast<float>(px),static_cast<float>(py) }, v0, v1, v2, vertexRatio, !isTriangleList && index & 0x01)) continue;
+
 
 					//Attribute Interpolation
 					const float currentDepth{ 1.f / ((vertexRatio.x / mesh.vertices_out[mesh.indices[index]].position.z) + (vertexRatio.y / mesh.vertices_out[mesh.indices[index + 1]].position.z) + (vertexRatio.z / mesh.vertices_out[mesh.indices[index + 2]].position.z)) };

@@ -10,7 +10,7 @@ namespace dae
 {
 	namespace Utils
 	{
-		inline bool HitTest_Triangle(const Vector2& pixelVector, const Vector2& v0, const Vector2& v1, const Vector2& v2, Vector3& ratio,const bool shouldSwap)
+		inline bool IsPixelInTriangle(const Vector2& pixelVector, const Vector2& v0, const Vector2& v1, const Vector2& v2, Vector3& ratio,const bool shouldSwap)
 		{
 			const int swapFactor{ (-1 * shouldSwap + !shouldSwap) }; //1 bij list of even indices van strip, -1 bij oneven indices van strip
 
